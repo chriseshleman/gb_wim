@@ -1,0 +1,46 @@
+---
+title: "gb_wim"
+author: "Christopher Eshleman"
+date: "11/4/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readr)
+```
+
+```{r}
+gbe_test = read.csv("~/Dropbox/Work and research/Port Authority/PA data & analysis/PA WIM/PA GB data/gb_wim/gbe_IRD ASCII Extended Raw Data Set_20191101160843843.csv") 
+gbe_test$direction = "e" 
+
+gbw_test = read.csv("~/Dropbox/Work and research/Port Authority/PA data & analysis/PA WIM/PA GB data/gb_wim/gbw_IRD ASCII Extended Raw Data Set_20191101160811755.csv") 
+gbw_test$direction = "w" 
+
+gb_test = rbind(gbe_test,gbw_test) 
+```
+
+Not sure what to do with the raw unextended data - doesn't come with variable names. 
+```{r}
+gbe_small = read_csv("~/Dropbox/Work and research/Port Authority/PA data & analysis/PA WIM/PA GB data/gb_wim/gbe_IRD ASCII Raw Data_20191101160843843.csv")
+head(gbe_small) 
+```
+
+Anyway, are tractor trailers crossing the bridge westbound heavier than those crossing eastbound? I would expect them to be. 
+```{r}
+tractor = subset(gb_test, gb_test$vehicleClass==9) 
+summary(lm(gb_test$GVW ~ gb_test$direction))  
+plot(gb_test$GVW, gb_test$direction) 
+```
+
+
+
+```{r}
+truck = subset(gwb, gwb$vehicleClass>=4) 
+summary(as.numeric(truck$ESAL)) 
+summary(as.numeric(truck$GVW)) 
+```
+
