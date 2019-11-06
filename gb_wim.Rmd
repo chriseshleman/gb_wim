@@ -1,46 +1,122 @@
 ---
 title: "gb_wim"
 author: "Christopher Eshleman"
-date: "11/4/2019"
-output: pdf_document
+date: "11/5/2019"
+output:
+  word_document: default
+  pdf_document: default
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup, echo=FALSE, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, include=FALSE, message=FALSE, warnings=FALSE)
 ```
 
 ```{r}
+rm(list = ls()) # clear global environment 
+cat("\014") # clear the console 
+dev.off() 
+
 library(readr)
+library(dplyr) 
+library(tidyr) 
 ```
 
 ```{r}
-gbe_test = read.csv("~/Dropbox/Work and research/Port Authority/PA data & analysis/PA WIM/PA GB data/gb_wim/gbe_IRD ASCII Extended Raw Data Set_20191101160843843.csv") 
-gbe_test$direction = "e" 
-
-gbw_test = read.csv("~/Dropbox/Work and research/Port Authority/PA data & analysis/PA WIM/PA GB data/gb_wim/gbw_IRD ASCII Extended Raw Data Set_20191101160811755.csv") 
-gbw_test$direction = "w" 
-
-gb_test = rbind(gbe_test,gbw_test) 
+setwd("~/Dropbox/Work and research/Port Authority/PA data & analysis/PA WIM/PA GB data/gb_wim/") 
+#setwd("C:/Users/ceshleman/Dropbox/Work and research/Port Authority/PA data & analysis/PA WIM/PA GB data/gb_wim")
 ```
 
-Not sure what to do with the raw unextended data - doesn't come with variable names. 
+```{r, include=FALSE, echo=FALSE}
+
+gbe.test = read.csv("./gbe_IRD ASCII Extended Raw Data Set_20191101160843843.csv") 
+gbe.test$direction = "East" 
+#names(gbe.test) 
+#head(gbe.test$externalDataItemTag.3)
+#head(gbe.test$externalDataItemInfo.3)
+
+gbw.test = read.csv("./gbw_IRD ASCII Extended Raw Data Set_20191101160811755.csv") 
+gbw.test$direction = "West" 
+
+gb.test = rbind(gbe.test, gbw.test) 
+#names(gb.test) 
+#table(gb.test$year)
+#table(gb.test$month) 
+#table(gb.test$day) 
+```
+
+Use iANALYZE to eat the raw data files and spit them back out as .csv files. There are two files, one covering a day — June 15, 2018, a Friday — of eastbound traffic and a second — June 4, 2018, a Monday — for a day of westbound traffic. 
+
+```{r, include=TRUE, echo=FALSE}
+table(gb.test$day,gb.test$direction) 
+```
+
+Above: there are a few more trucks headed eastbound on the Friday headed westbound on the Monday. 
+
+The software gives us two data sets per day - one raw and one "extended." I'm not sure what to do with the raw unextended data - doesn't come with variable names. But the "extended" data set is rich and has data parsed by variable, which makes it slightly easier to manage than the data dumps we receive for the Alexander Hamilton Bridge in the Bronx. 
+
 ```{r}
-gbe_small = read_csv("~/Dropbox/Work and research/Port Authority/PA data & analysis/PA WIM/PA GB data/gb_wim/gbe_IRD ASCII Raw Data_20191101160843843.csv")
-head(gbe_small) 
+gbe.small = read_csv("./gbe_IRD ASCII Raw Data_20191101160843843.csv")
+head(gbe.small) 
 ```
 
 Anyway, are tractor trailers crossing the bridge westbound heavier than those crossing eastbound? I would expect them to be. 
-```{r}
-tractor = subset(gb_test, gb_test$vehicleClass==9) 
-summary(lm(gb_test$GVW ~ gb_test$direction))  
-plot(gb_test$GVW, gb_test$direction) 
-```
 
-
+We can group the data for analysis and visualization after a little munging. One annoying thing is that IRD reports weight in metric units and they've been scaled - for example, they're stored for the Alexander Hamilton as tonnes*10. Here, they're something else — perhaps one-tenths of a tonne. Either way "GVW" needs to be converted to pounds. 
 
 ```{r}
-truck = subset(gwb, gwb$vehicleClass>=4) 
-summary(as.numeric(truck$ESAL)) 
-summary(as.numeric(truck$GVW)) 
+gb.test$date = paste(gb.test$year, gb.test$month, gb.test$day, sep="-")
+gb.test$date = as.Date(gb.test$date,"%y-%m-%d") 
+
+gbe.test$count = 1 
+
+by.hour = gbe.test %>% 
+  group_by(hour, vehicleClass) %>%
+  summarize(count = sum(count, na.rm = TRUE)) 
+by.hour 
+by.hour = spread(by.hour, vehicleClass, count) 
+by.hour[is.na(by.hour)] = 0 # Yes, replacing NA with 0 is appropriate here. 
+write.csv(by.hour, "./By_hour.csv") 
+
+#gb.test$weight = as.numeric(gb.test$GVW) * 2204.62 / 10   # turn tonnes or whatever into pounds 
+#gb.test = gb.test[!(is.na(gb.test$weight)),]  # clear any glitchy rows without weights, as they'll mess things up 
 ```
 
+```{r}
+tractor = subset(gb.test, gb.test$vehicleClass==9) 
+tractor.summary = tractor %>% 
+  group_by(direction) %>%   
+  summarise(mean = mean(GVW),  # calculates the mean
+            sd = sd(GVW), # calculates the standard deviation
+            lower = mean(GVW) - sd(GVW),
+            upper = mean(GVW) + sd(GVW)) 
+tractor.summary 
+table(gb.test$direction) 
+summary(gb.test$GVW) 
+plot(gb.test$GVW)
+```
+
+#Question: 
+###Are trucks headed west heavier than those headed east? 
+Do a basic t-test - are they heavier? 
+
+```{r, echo=FALSE, include=TRUE}
+tractor.plot = barplot(tractor.summary$mean, names.arg = tractor.summary$direction,
+                      ylab="Gross weight (GVW)", xlab = "Direction", ylim=c(0,60), col='blue')
+arrows(tractor.plot, tractor.summary$lower, tractor.plot, tractor.summary$upper, angle=90, code=3) 
+summary(lm(gb.test$GVW ~ gb.test$direction)) 
+```
+
+#Answer:
+###Absolutely not. 
+Trucks crossing EASTBOUND are heavier than westbound, on average, for those two days. 
+
+#Next steps: 
+Put together synopsis of these two data samples. What it shows – summary of variables.
+- Summary stats.
+- Patterns by time of day? Is there a combination of direction-day-time when it looks really bad?
+- Validate it against count data from tools? 
+- Weight by class – summary statistics? 
+Future: 
+- Repeat offenders? 
+- Patterns by day of the week?
+Note: data dictionary in iAnalyze to accompany extended data set. 
