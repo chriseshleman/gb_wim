@@ -1,0 +1,195 @@
+---
+title: "gb_wim"
+author: "Christopher Eshleman"
+date: "11/5/2019"
+output:
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, echo=FALSE, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, include=FALSE, message=FALSE, warnings=FALSE)
+```
+
+```{r}
+rm(list = ls()) # clear global environment 
+cat("\014") # clear the console 
+dev.off() 
+
+library(readr)
+library(dplyr) 
+library(tidyr) 
+#install.packages("stargazer") 
+library(stargazer) 
+```
+
+```{r}
+setwd("~/Dropbox/Work and research/Port Authority/PA GB data/gb_wim/") #/PA data & analysis/PA WIM
+#setwd("C:/Users/ceshleman/Dropbox/Work and research/Port Authority/PA data & analysis/PA WIM/PA GB data/gb_wim")
+```
+
+HERE'S WHERE I'M WORKING TODAY 2/15
+
+```{r}
+list.files() 
+#aa = read.csv("./gbe_IRD ASCII Raw Data_20191101160843843.csv") 
+#aa = data.frame(read.csv("./gbe_IRD ASCII Raw Data_20191101160843843.csv",
+#                        header=F,stringsAsFactors=FALSE,
+#                        colClasses=c(rep("character",32),rep("NULL",5)),
+#                        na.string=c("","null","NaN","X")))
+#aa = read.csv("./gbe_IRD ASCII Extended Raw Data Set_20191101160843843.csv")
+```
+
+TO HERE TO HERE TO HERE TO HERE TO HERE
+Bottom line: need to re-export data to ensure using FHWA format or to use a schema that provides axle count. 
+Of interest: 
+"E.1.2 Custom: PVR (Per Vehicle Record) – 201" (p E-3) looks very clean, and,
+"E.1.32 FHWA TMG Truck Weight (New York) - 231" (p E-62) includes axle count. 
+
+```{r, include=FALSE, echo=FALSE}
+
+gbe.test = read.csv("./gbe_IRD ASCII Extended Raw Data Set_20191101160843843.csv") 
+gbe.test$direction = "East" 
+#names(gbe.test) 
+#head(gbe.test$externalDataItemTag.3)
+#head(gbe.test$externalDataItemInfo.3)
+
+gbw.test = read.csv("./gbw_IRD ASCII Extended Raw Data Set_20191101160811755.csv") 
+gbw.test$direction = "West" 
+
+gb.test = rbind(gbe.test, gbw.test) 
+#names(gb.test) 
+#table(gb.test$year)
+#table(gb.test$month) 
+#table(gb.test$day) 
+```
+
+Use iANALYZE to eat the raw data files and spit them back out as .csv files. There are two files, one covering a day — June 15, 2018, a Friday — of eastbound traffic and a second — June 4, 2018, a Monday — for a day of westbound traffic. 
+
+```{r, include=TRUE, echo=FALSE}
+table(gb.test$day,gb.test$direction) 
+```
+
+Above: there are a few more trucks headed eastbound on the Friday headed westbound on the Monday. 
+
+The software gives us two data sets per day - one raw and one "extended." I'm not sure what to do with the raw unextended data - doesn't come with variable names. But the "extended" data set is rich and has data parsed by variable, which makes it slightly easier to manage than the data dumps we receive for the Alexander Hamilton Bridge in the Bronx. 
+
+```{r}
+gbe.small = read_csv("./gbe_IRD ASCII Raw Data_20191101160843843.csv", skip=0) 
+rm(gbe.small) 
+```
+
+Anyway, are tractor trailers crossing the bridge westbound heavier than those crossing eastbound? I would expect them to be. 
+
+We can group the data for analysis and visualization after a little munging. One annoying thing is that IRD reports weight in metric units and they've been scaled - for example, they're stored for the Alexander Hamilton as tonnes*10. Here, they're something else — perhaps one-tenths of a tonne. Either way "GVW" needs to be converted to pounds.
+
+```{r}
+gb.test$date = paste(gb.test$year, gb.test$month, gb.test$day, sep="-")
+gb.test$date = as.Date(gb.test$date,"%y-%m-%d") 
+
+gb.test$count = 1 
+head(gb.test, 3) 
+```
+
+##By time of day
+```{r}
+gb.test$hour.group = ifelse(gb.test$hour<9,"Midn-8AM",ifelse(gb.test$hour>=9 & gb.test$hour<=16,"8AM-4PM","4PM-Midn"))
+print(levels(as.factor(gb.test$hour.group)))
+gb.test$hour.group2 = factor(gb.test$hour.group,levels(factor(gb.test$hour.group))[c(3,2,1)])
+gb.test.hour.group = table(gb.test$direction,gb.test$hour.group2)
+```
+
+```{r results = "asis"}
+library(knitr) 
+kable(gb.test.hour.group) #caption = "by time of day"
+#kable(mtcars[1:5,], caption = "a knitr table") 
+```
+
+```{r}
+library(ggplot2) 
+a = ggplot(gb.test, aes(hour, fill = direction, colour = direction)) +
+  geom_density(alpha = 0.1) 
+a + theme(legend.title = element_blank(), legend.position = c(0.85, 0.15)) + ylab("")
+```
+
+##By Vehicle Class 
+```{r include=TRUE, echo=TRUE} 
+table(gb.test$vehicleClass) 
+```
+
+The "vehicleClass" variable doesn't appear to align with classification systems we are used to, which count five-axle trucks as either class 5 or 9; both classes 5 and 9 are too sparesely populated in this data to represent tractor trailer trucks. 
+
+#HERE HERE HERE HERE HERE HERE HERE HERE HERE HERE HERE HERE HERE HERE HERE 
+
+```{r}
+table(gb.test$vehicleType) 
+head(gb.test,2) 
+names(gb.test) 
+gb.test$class.group = ifelse(gb.test$vehicleClass<9,"Midn-8AM",ifelse(gb.test$hour>=9 & gb.test$hour<=16,"8AM-4PM","4PM-Midn"))
+print(levels(as.factor(gb.test$hour.group)))
+gb.test$hour.group2 = factor(gb.test$hour.group,levels(factor(gb.test$hour.group))[c(3,2,1)])
+gb.test.hour.group = table(gb.test$direction,gb.test$hour.group2)
+```
+
+```{r results = "asis"}
+library(knitr) 
+kable(gb.test.hour.group) #caption = "by time of day"
+#kable(mtcars[1:5,], caption = "a knitr table") 
+```
+
+
+```{r}
+#class.by.hour = gbe.test %>% 
+#  group_by(hour, vehicleClass) %>% 
+#  summarize(count = sum(count, na.rm = TRUE)) 
+#class.by.hour = spread(class.by.hour, vehicleClass, count) 
+#class.by.hour[is.na(class.by.hour)] = 0 # Yes, replacing NA with 0 is appropriate here. 
+#write.csv(class.by.hour, "./By_hour.csv") 
+#head(class.by.hour, 5) 
+```
+
+
+```{r}
+#gb.test$weight = as.numeric(gb.test$GVW) * 2204.62 / 10   # turn tonnes or whatever into pounds 
+#gb.test = gb.test[!(is.na(gb.test$weight)),]  # clear any glitchy rows without weights, as they'll mess things up 
+```
+
+
+```{r}
+tractor = subset(gb.test, gb.test$vehicleClass==9) 
+tractor.summary = tractor %>% 
+  group_by(direction) %>%   
+  summarise(mean = mean(GVW),  # calculates the mean
+            sd = sd(GVW), # calculates the standard deviation
+            lower = mean(GVW) - sd(GVW),
+            upper = mean(GVW) + sd(GVW)) 
+tractor.summary 
+table(gb.test$direction) 
+summary(gb.test$GVW) 
+plot(gb.test$GVW)
+```
+
+#Question: 
+###Are trucks headed west heavier than those headed east? 
+Do a basic t-test - are they heavier? 
+
+```{r, echo=FALSE, include=TRUE}
+tractor.plot = barplot(tractor.summary$mean, names.arg = tractor.summary$direction,
+                      ylab="Gross weight (GVW)", xlab = "Direction", ylim=c(0,60), col='blue')
+arrows(tractor.plot, tractor.summary$lower, tractor.plot, tractor.summary$upper, angle=90, code=3) 
+summary(lm(gb.test$GVW ~ gb.test$direction)) 
+```
+
+#Answer:
+###Absolutely not. 
+Trucks crossing EASTBOUND are heavier than westbound, on average, for those two days.
+
+#Next steps:
+- Summary stats. 
+- Extrend using three full months. 
+- Unsupervised considerations. 
+
+```{r}
+#head(by.hour,4) 
+```
+
